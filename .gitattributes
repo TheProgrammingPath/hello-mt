@@ -1,0 +1,6 @@
+# Store text files with LF line endings, even on Windows
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary

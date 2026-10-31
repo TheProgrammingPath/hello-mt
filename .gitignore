@@ -1,0 +1,32 @@
+# Terraform (commit .terraform.lock.hcl; never commit state or plans)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Secrets and credentials: never in Git
+.env
+.env.*
+*.pem
+*.key
+*.pfx
+kubeconfig*
+
+# Generated at build time (P2.2)
+site/version.json
+
+# Node
+node_modules/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
