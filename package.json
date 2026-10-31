@@ -1,0 +1,12 @@
+{
+  "name": "hello-mt",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lint tooling for the hello-mt static site",
+  "scripts": {
+    "lint": "htmlhint site/"
+  },
+  "devDependencies": {
+    "htmlhint": "^1.9.2"
+  }
+}
