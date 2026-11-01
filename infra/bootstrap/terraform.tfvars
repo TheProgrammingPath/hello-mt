@@ -1,0 +1,7 @@
+initials             = "mt"
+location             = "eastus"
+owner                = "Mohamed Toure"
+expires_on           = "2026-11-30"
+github_repository    = "TheProgrammingPath/hello-mt"
+github_owner_id      = "246157217"
+github_repository_id = "1441049661"
