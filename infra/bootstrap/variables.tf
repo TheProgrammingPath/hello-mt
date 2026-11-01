@@ -28,3 +28,13 @@ variable "expires_on" {
     error_message = "expires_on must be a date in YYYY-MM-DD format."
   }
 }
+
+variable "github_repository" {
+  type        = string
+  description = "GitHub repository (owner/name) whose workflows may use the OIDC identities."
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", var.github_repository))
+    error_message = "github_repository must look like owner/name."
+  }
+}

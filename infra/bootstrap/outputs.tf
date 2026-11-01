@@ -17,3 +17,17 @@ output "acr_login_server" {
   description = "Login server of the shared container registry."
   value       = azurerm_container_registry.acr.login_server
 }
+output "github_client_ids" {
+  description = "Client IDs of the GitHub OIDC identities (IDs, not secrets)."
+  value       = { for k, id in azurerm_user_assigned_identity.gh : k => id.client_id }
+}
+
+output "tenant_id" {
+  description = "Entra tenant ID."
+  value       = data.azurerm_client_config.current.tenant_id
+}
+
+output "subscription_id" {
+  description = "Azure subscription ID."
+  value       = data.azurerm_client_config.current.subscription_id
+}
