@@ -38,3 +38,12 @@ variable "github_repository" {
     error_message = "github_repository must look like owner/name."
   }
 }
+variable "github_owner_id" {
+  type        = string
+  description = "Numeric ID of the GitHub repository owner (part of the OIDC subject)."
+}
+
+variable "github_repository_id" {
+  type        = string
+  description = "Numeric ID of the GitHub repository (part of the OIDC subject)."
+}

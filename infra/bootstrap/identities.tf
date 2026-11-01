@@ -11,11 +11,19 @@ resource "azurerm_user_assigned_identity" "gh" {
 }
 
 locals {
+  # GitHub's OIDC subject includes immutable owner and repo IDs:
+  # repo:<owner>@<owner_id>/<repo>@<repo_id>:<context>
+  github_subject_prefix = format(
+    "repo:%s@%s/%s@%s",
+    split("/", var.github_repository)[0], var.github_owner_id,
+    split("/", var.github_repository)[1], var.github_repository_id
+  )
+
   federated_subjects = {
-    "plan-pull-request" = { identity = "plan", subject = "repo:${var.github_repository}:pull_request" }
-    "plan-main"         = { identity = "plan", subject = "repo:${var.github_repository}:ref:refs/heads/main" }
-    "dev-environment"   = { identity = "dev", subject = "repo:${var.github_repository}:environment:dev" }
-    "prod-environment"  = { identity = "prod", subject = "repo:${var.github_repository}:environment:prod" }
+    "plan-pull-request" = { identity = "plan", subject = "${local.github_subject_prefix}:pull_request" }
+    "plan-main"         = { identity = "plan", subject = "${local.github_subject_prefix}:ref:refs/heads/main" }
+    "dev-environment"   = { identity = "dev", subject = "${local.github_subject_prefix}:environment:dev" }
+    "prod-environment"  = { identity = "prod", subject = "${local.github_subject_prefix}:environment:prod" }
   }
 
   identity_roles = {
@@ -38,11 +46,11 @@ locals {
 resource "azurerm_federated_identity_credential" "gh" {
   for_each = local.federated_subjects
 
-  name      = "github-${each.key}"
-  parent_id = azurerm_user_assigned_identity.gh[each.value.identity].id
-  issuer    = "https://token.actions.githubusercontent.com"
-  audience  = ["api://AzureADTokenExchange"]
-  subject   = each.value.subject
+  name                      = "github-${each.key}"
+  user_assigned_identity_id = azurerm_user_assigned_identity.gh[each.value.identity].id
+  issuer                    = "https://token.actions.githubusercontent.com"
+  audience                  = ["api://AzureADTokenExchange"]
+  subject                   = each.value.subject
 }
 
 resource "azurerm_role_assignment" "gh" {
