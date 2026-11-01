@@ -1,0 +1,5 @@
+# Allowlist: send nothing to the build except what the Dockerfile copies.
+# This keeps .git, infra/, k8s/, docs/, node_modules/ and any local
+# secrets out of the build context and out of the image.
+*
+!site/
