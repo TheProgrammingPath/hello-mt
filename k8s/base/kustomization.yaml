@@ -1,0 +1,8 @@
+# Lists the files Kustomize combines. The overlays (Task 4) point at
+# this folder and add only what differs per environment.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - service.yaml
+  - deployment.yaml

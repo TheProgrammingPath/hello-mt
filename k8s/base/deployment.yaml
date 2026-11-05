@@ -1,0 +1,29 @@
+# Runs the site's pods and replaces them safely during a rollout.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello
+  namespace: hello
+  labels:
+    app: hello
+spec:
+  # No replicas field: the HPA (Task 3) decides how many pods run.
+  selector:
+    matchLabels:
+      app: hello           # must match the pod template labels below
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0    # never remove an old pod before a new one is Ready
+      maxSurge: 1          # start one extra pod at a time during a rollout
+  template:
+    metadata:
+      labels:
+        app: hello         # the Service selector and matchLabels point here
+    spec:
+      containers:
+        - name: hello
+          image: hello     # placeholder; the overlay sets crhellomt.azurecr.io/hello:<sha>
+          ports:
+            - name: http
+              containerPort: 8080   # nginx listens on 8080 (non-root)

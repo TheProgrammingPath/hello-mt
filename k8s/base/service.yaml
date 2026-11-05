@@ -1,0 +1,17 @@
+# A stable, cluster-internal address for the pods. Pods come and go;
+# the Service keeps the same name and IP and load-balances across them.
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello
+  namespace: hello
+  labels:
+    app: hello
+spec:
+  type: ClusterIP          # internal only; the Ingress (Task 3) exposes it
+  selector:
+    app: hello             # sends traffic to pods with this label
+  ports:
+    - name: http
+      port: 8080           # the port the Service listens on
+      targetPort: http     # the container port named "http"
