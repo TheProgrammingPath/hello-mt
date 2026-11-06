@@ -1,0 +1,19 @@
+# Routes HTTP from the app routing add-on's public IP to the Service.
+# The overlays add a host name (e.g. hello-dev.<ip>.nip.io).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hello
+  namespace: hello
+spec:
+  ingressClassName: webapprouting.kubernetes.azure.com
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hello
+                port:
+                  number: 8080

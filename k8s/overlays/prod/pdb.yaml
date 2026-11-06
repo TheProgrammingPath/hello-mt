@@ -1,0 +1,10 @@
+# Keep at least one pod during node drains and upgrades (prod only).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hello
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: hello

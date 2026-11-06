@@ -1,0 +1,6 @@
+# A namespace groups everything for this app and keeps it separate
+# from system workloads (kube-system, app-routing-system).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hello
