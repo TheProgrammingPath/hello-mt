@@ -15,6 +15,7 @@ locals {
     project      = "hello"
     "managed-by" = "terraform"
     "expires-on" = var.expires_on
+    repo         = "hello-mt"
   }
 }
 
