@@ -4,6 +4,8 @@
 
 data "azurerm_client_config" "current" {}
 
+# Accepted risk (see ADR): hosted runners have no fixed IPs; API access needs Entra ID + Azure RBAC, local accounts disabled.
+#trivy:ignore:AZU-0041
 resource "azurerm_kubernetes_cluster" "this" {
   name                = var.name
   location            = var.location
