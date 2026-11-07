@@ -1,0 +1,119 @@
+# Infra CD: on merge to main, apply dev, plan prod (saved), apply prod after approval (P6.6).
+name: terraform-apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/envs/**"
+      - "infra/modules/**"
+      - ".github/workflows/terraform-apply.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_IN_AUTOMATION: "true"
+  ARM_USE_OIDC: "true"
+  ARM_USE_AZUREAD: "true"
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  apply-dev:
+    runs-on: ubuntu-latest
+    environment: dev
+    concurrency:
+      group: tf-apply-dev
+      cancel-in-progress: false
+    env:
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+    defaults:
+      run:
+        working-directory: infra/envs/dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.2
+          terraform_wrapper: false
+      - name: terraform init
+        run: terraform init -input=false
+      - name: terraform apply (dev)
+        run: terraform apply -input=false -auto-approve -no-color
+
+  plan-prod:
+    needs: apply-dev
+    runs-on: ubuntu-latest
+    env:
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID_PLAN }}
+    defaults:
+      run:
+        working-directory: infra/envs/prod
+    outputs:
+      changes: ${{ steps.plan.outputs.changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.2
+          terraform_wrapper: false
+      - name: terraform init
+        run: terraform init -input=false
+      - name: terraform plan (prod, saved)
+        id: plan
+        run: |
+          set +e
+          terraform plan -input=false -no-color -detailed-exitcode -out=tfplan > plan.txt 2>&1
+          code=$?
+          set -e
+          cat plan.txt
+          {
+            echo "### Prod plan (apply-prod waits for approval)"
+            echo '```'
+            tail -c 60000 plan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" -eq 1 ]; then exit 1; fi
+          if [ "$code" -eq 2 ]; then echo "changes=true" >> "$GITHUB_OUTPUT"; else echo "changes=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Upload saved plan
+        if: steps.plan.outputs.changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-prod
+          path: infra/envs/prod/tfplan
+          retention-days: 1
+
+  apply-prod:
+    needs: plan-prod
+    if: needs.plan-prod.outputs.changes == 'true'
+    runs-on: ubuntu-latest
+    environment: prod
+    concurrency:
+      group: tf-apply-prod
+      cancel-in-progress: false
+    env:
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+    defaults:
+      run:
+        working-directory: infra/envs/prod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.2
+          terraform_wrapper: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan-prod
+          path: infra/envs/prod
+      - name: terraform init
+        run: terraform init -input=false
+      - name: terraform apply (prod, the exact approved plan)
+        run: terraform apply -input=false -no-color tfplan
