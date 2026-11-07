@@ -32,4 +32,4 @@ patches:
     patch: |-
       - op: add
         path: /spec/rules/0/host
-        value: hello-prod.PROD-IP-SET-IN-TASK-9.nip.io
+        value: hello-prod.20.242.237.48.nip.io

@@ -1,13 +1,9 @@
-# Infra CI: on PRs touching infra, check and plan dev + prod as the plan identity (P6.5).
+# Infra CI: runs on every PR; checks and plans dev + prod only when infra changed (P6.5, P6.8).
 name: terraform
 
 on:
   pull_request:
     branches: [main]
-    paths:
-      - "infra/**"
-      - ".tflint.hcl"
-      - ".github/workflows/terraform.yml"
 
 permissions:
   contents: read
@@ -25,8 +21,36 @@ env:
   ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      infra: ${{ steps.diff.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Did this PR touch infra?
+        id: diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          files="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          echo "$files"
+          if grep -qE '^(infra/|\.tflint\.hcl$|\.github/workflows/terraform\.yml$)' <<< "$files"; then
+            echo "infra=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "infra=false" >> "$GITHUB_OUTPUT"
+          fi
+
   trivy-config:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +60,8 @@ jobs:
             --exit-code 1 --severity CRITICAL /src/infra
 
   plan:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -44,7 +70,6 @@ jobs:
     defaults:
       run:
         working-directory: infra/envs/${{ matrix.env }}
-        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -85,3 +110,20 @@ jobs:
             if [ -f plan.txt ]; then tail -c 60000 plan.txt; else echo "no plan output"; fi
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  plan-ok:
+    needs: [changes, trivy-config, plan]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Infra checks passed, or were not needed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::an infra check did not pass ($r)"; exit 1 ;;
+            esac
+          done
