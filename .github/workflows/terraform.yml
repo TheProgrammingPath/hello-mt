@@ -1,0 +1,86 @@
+# Infra CI: on PRs touching infra, check and plan dev + prod as the plan identity (P6.5).
+name: terraform
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - ".tflint.hcl"
+      - ".github/workflows/terraform.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: tf-plan-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  TF_IN_AUTOMATION: "true"
+  ARM_USE_OIDC: "true"
+  ARM_USE_AZUREAD: "true"
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID_PLAN }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  trivy-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy config scan (infra/)
+        run: |
+          docker run --rm -v "$PWD:/src" aquasec/trivy:0.76.1 config \
+            --exit-code 1 --severity CRITICAL /src/infra
+
+  plan:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [dev, prod]
+    defaults:
+      run:
+        working-directory: infra/envs/${{ matrix.env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.2
+          terraform_wrapper: false
+
+      - uses: terraform-linters/setup-tflint@v4
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive "$GITHUB_WORKSPACE/infra"
+
+      - name: terraform init
+        run: terraform init -input=false
+
+      - name: terraform validate
+        run: terraform validate -no-color
+
+      - name: tflint
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          tflint --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
+          tflint --config "$GITHUB_WORKSPACE/.tflint.hcl" --call-module-type=all
+
+      - name: terraform plan
+        run: terraform plan -input=false -no-color -lock=false | tee plan.txt
+
+      - name: Post plan to job summary
+        if: always()
+        env:
+          ENV_NAME: ${{ matrix.env }}
+        run: |
+          {
+            echo "### Terraform plan: $ENV_NAME"
+            echo '```'
+            if [ -f plan.txt ]; then tail -c 60000 plan.txt; else echo "no plan output"; fi
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
