@@ -1,0 +1,81 @@
+# App CI: runs on every pull request to main (P6.1-P6.3).
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+
+# Least privilege: this workflow only reads the repo.
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the older, now-outdated run.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: htmlhint (site)
+        run: |
+          npm ci
+          npm run lint
+
+      - name: hadolint (Dockerfile)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: kubeconform (dev and prod overlays)
+        run: |
+          for env in dev prod; do
+            echo "== $env =="
+            kubectl kustomize "k8s/overlays/$env" | kubeconform -strict -summary
+          done
+
+  build-test-scan:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image (not pushed)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          platforms: linux/amd64
+          tags: hello:${{ github.sha }}
+          build-args: APP_VERSION=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run the container the way Kubernetes will
+        run: docker run -d --name hello --read-only --tmpfs /tmp -p 8080:8080 "hello:${{ github.sha }}"
+
+      - name: Smoke test
+        run: scripts/smoke.sh http://localhost:8080 "${{ github.sha }}"
+
+      - name: Trivy (fail on fixable CRITICAL)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.76.1 image --exit-code 1 --ignore-unfixed \
+            --severity CRITICAL "hello:${{ github.sha }}"
