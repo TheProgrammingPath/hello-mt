@@ -2,6 +2,8 @@ data "azurerm_client_config" "current" {}
 
 # P3.3: remote state storage. Entra ID only (no keys), TLS 1.2,
 # versioning and soft delete, and protected from accidental destroy.
+# Accepted risk (see ADR): hosted runners have no fixed IPs; shared keys disabled, Entra ID auth only, TLS 1.2.
+#trivy:ignore:AZU-0012
 resource "azurerm_storage_account" "state" {
   name                = "st${local.app}${var.initials}state"
   resource_group_name = azurerm_resource_group.shared.name
