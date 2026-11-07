@@ -38,6 +38,7 @@ locals {
 
     "prod-owner"    = { identity = "prod", role = "Owner", scope = azurerm_resource_group.env["prod"].id }
     "prod-acr-pull" = { identity = "prod", role = "AcrPull", scope = azurerm_container_registry.acr.id }
+    "plan-acr-read" = { identity = "plan", role = "Reader", scope = azurerm_container_registry.acr.id }
     "prod-acr-rbac" = { identity = "prod", role = "Role Based Access Control Administrator", scope = azurerm_container_registry.acr.id }
     "prod-state"    = { identity = "prod", role = "Storage Blob Data Contributor", scope = azurerm_storage_account.state.id }
   }
