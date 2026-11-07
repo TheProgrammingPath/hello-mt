@@ -85,3 +85,9 @@ stopped once metrics were available.
     Summary: 6 resources found parsing stdin - Valid: 6, Invalid: 0, Errors: 0, Skipped: 0
     $ kubectl kustomize k8s/overlays/prod | kubeconform -strict -summary
     Summary: 7 resources found parsing stdin - Valid: 7, Invalid: 0, Errors: 0, Skipped: 0
+    ## Phase 6: CI (PR #7)
+
+- **P6.1:** `.github/workflows/ci.yml` runs on every PR to main: lint (htmlhint, hadolint, kubeconform on dev+prod), then build-test-scan (build without pushing, run read-only, smoke test, Trivy CRITICAL). `permissions: contents: read`, concurrency cancels stale runs. `actionlint`: clean. First run: both green (run 42345407874).
+- **P6.2 deliberate lint failure:** added `<DIV>broken on purpose` to index.html. lint ✗ (`tagname-lowercase`, `tag-pair`), build-test-scan **skipped** via `needs: lint` (run 42346450952). Screenshot: p6.2-lint-fail.png. Reverted.
+- **P6.3 deliberate smoke failure:** renamed `/healthz` to `/healthz-broken` in nginx.conf. build-test-scan ✗: `OK: /version.json reports <sha>` then `FAIL: /healthz returned 404, expected 200` (run 42348271489). Reverted.
+- **Build cache:** revert run 42347303208 reused 3 layers from the gha cache (`#14 CACHED`, `#15 CACHED`, `#17 CACHED`). Wall-clock time didn't drop (32 s → 51 s) because this job is dominated by runner startup and the Trivy image pull, not the tiny build. Caching pays off on heavier builds.
