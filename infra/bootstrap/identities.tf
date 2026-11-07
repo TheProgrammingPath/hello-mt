@@ -27,9 +27,11 @@ locals {
   }
 
   identity_roles = {
-    "plan-reader-dev"  = { identity = "plan", role = "Reader", scope = azurerm_resource_group.env["dev"].id }
-    "plan-reader-prod" = { identity = "plan", role = "Reader", scope = azurerm_resource_group.env["prod"].id }
-    "plan-state"       = { identity = "plan", role = "Storage Blob Data Contributor", scope = azurerm_storage_account.state.id }
+    "plan-reader-dev"    = { identity = "plan", role = "Reader", scope = azurerm_resource_group.env["dev"].id }
+    "plan-aks-user-dev"  = { identity = "plan", role = "Azure Kubernetes Service Cluster User Role", scope = azurerm_resource_group.env["dev"].id }
+    "plan-reader-prod"   = { identity = "plan", role = "Reader", scope = azurerm_resource_group.env["prod"].id }
+    "plan-aks-user-prod" = { identity = "plan", role = "Azure Kubernetes Service Cluster User Role", scope = azurerm_resource_group.env["prod"].id }
+    "plan-state"         = { identity = "plan", role = "Storage Blob Data Contributor", scope = azurerm_storage_account.state.id }
 
     "dev-owner"    = { identity = "dev", role = "Owner", scope = azurerm_resource_group.env["dev"].id }
     "dev-acr-push" = { identity = "dev", role = "AcrPush", scope = azurerm_container_registry.acr.id }
