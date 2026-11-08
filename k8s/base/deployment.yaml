@@ -40,7 +40,7 @@ spec:
               memory: 128Mi
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /healthz-nope
               port: http
             initialDelaySeconds: 2
             periodSeconds: 5
