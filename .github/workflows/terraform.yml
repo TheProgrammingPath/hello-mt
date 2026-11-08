@@ -17,6 +17,7 @@ env:
   TF_IN_AUTOMATION: "true"
   ARM_USE_OIDC: "true"
   ARM_USE_AZUREAD: "true"
+  TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
   ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID_PLAN }}
   ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}

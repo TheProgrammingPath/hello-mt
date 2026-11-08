@@ -37,6 +37,7 @@ module "monitoring" {
   resource_group_name = data.azurerm_resource_group.env.name
   daily_quota_gb      = var.log_daily_quota_gb
   tags                = local.tags
+  alert_email         = var.alert_email
 }
 
 data "azurerm_container_registry" "shared" {
