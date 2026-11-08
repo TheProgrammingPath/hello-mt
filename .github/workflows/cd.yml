@@ -72,7 +72,9 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - uses: azure/setup-kubelogin@v1
+      - uses: azure/use-kubelogin@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Get AKS credentials (Entra ID, no local accounts)
         run: |
@@ -131,7 +133,9 @@ jobs:
             exit 1
           fi
 
-      - uses: azure/setup-kubelogin@v1
+      - uses: azure/use-kubelogin@v1
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Get AKS credentials (Entra ID, no local accounts)
         run: |
