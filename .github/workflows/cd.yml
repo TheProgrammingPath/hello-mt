@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: dev
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Azure login (dev identity, OIDC)
         uses: azure/login@v2
@@ -63,7 +63,7 @@ jobs:
     env:
       BASE_URL: http://hello-dev.48.206.54.156.nip.io
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Azure login (dev identity, OIDC)
         uses: azure/login@v2
@@ -114,7 +114,7 @@ jobs:
     env:
       BASE_URL: http://hello-prod.20.242.237.48.nip.io
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Azure login (prod identity, OIDC)
         uses: azure/login@v2
