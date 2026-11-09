@@ -17,7 +17,7 @@ resource "azurerm_monitor_action_group" "email" {
   tags                = var.tags
 
   email_receiver {
-    name                    = "owner"
+    name                    = "owner-email"
     email_address           = var.alert_email
     use_common_alert_schema = true
   }
