@@ -27,10 +27,10 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "restarts" {
   name                    = "alert-restarts-${local.suffix}"
   resource_group_name     = var.resource_group_name
   location                = var.location
-  description             = "More than 3 container restarts in the hello namespace within 15 minutes (crash loop)."
+  description             = "More than 3 container restarts in the hello namespace within 30 minutes (crash loop)."
   severity                = 2
   evaluation_frequency    = "PT5M"
-  window_duration         = "PT15M"
+  window_duration         = "PT30M"
   scopes                  = [azurerm_log_analytics_workspace.this.id]
   auto_mitigation_enabled = true
   tags                    = var.tags
