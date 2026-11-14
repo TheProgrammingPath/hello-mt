@@ -15,6 +15,12 @@ LABEL org.opencontainers.image.source="https://github.com/TheProgrammingPath/hel
       org.opencontainers.image.revision="${APP_VERSION}" \
       org.opencontainers.image.title="hello-mt"
 
+# Patch OS packages that have published fixes (musl CVE-2026-107891,
+# zlib CVE-2026-85091) without waiting for upstream to rebuild the base.
+# Needs root for this one step; USER 101 below drops back to non-root.
+USER root
+RUN apk upgrade --no-cache 
+
 COPY site/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /src/ /usr/share/nginx/html/
 
