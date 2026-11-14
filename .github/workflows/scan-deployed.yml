@@ -1,0 +1,80 @@
+name: scan-deployed
+
+# Re-scan the image that CD built and deployed. New CVEs are published after
+# the build, so a clean image at build time can become vulnerable later (P8.4).
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag (commit SHA). Leave empty for the newest image in ACR."
+        required: false
+        default: ""
+  schedule:
+    - cron: "17 13 * * 1" # Mondays 13:17 UTC
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: scan-deployed
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  TRIVY: aquasec/trivy:0.76.1
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve image
+        id: img
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          tag="$INPUT_TAG"
+          if [ -z "$tag" ]; then
+            tag=$(az acr repository show-tags --name crhellomt --repository hello --orderby time_desc --top 1 -o tsv)
+          fi
+          echo "image=crhellomt.azurecr.io/hello:$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Pull image
+        env:
+          IMAGE: ${{ steps.img.outputs.image }}
+        run: |
+          az acr login --name crhellomt
+          docker pull "$IMAGE"
+
+      - name: Trivy report (HIGH, CRITICAL)
+        env:
+          IMAGE: ${{ steps.img.outputs.image }}
+        run: |
+          mkdir -p "$HOME/.cache/trivy"
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.cache/trivy:/root/.cache/trivy" \
+            "$TRIVY" image --no-progress --ignore-unfixed --severity HIGH,CRITICAL "$IMAGE" | tee report.txt
+          {
+            echo "## Trivy scan of deployed image"
+            echo "Image: $IMAGE"
+            echo '```'
+            cat report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail on CRITICAL
+        env:
+          IMAGE: ${{ steps.img.outputs.image }}
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.cache/trivy:/root/.cache/trivy" \
+            "$TRIVY" image --no-progress --skip-db-update --ignore-unfixed --severity CRITICAL --exit-code 1 "$IMAGE"
