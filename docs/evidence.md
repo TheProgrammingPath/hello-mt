@@ -111,3 +111,54 @@ stopped once metrics were available.
 - **P7.3 automatic rollback:** wrong readiness probe path (PR #32): rollout timed out, `kubectl rollout undo` ran, run red, deploy-prod skipped, dev kept serving `e812e1d` (`maxUnavailable: 0`). Screenshot: p7.3-auto-rollback.png.
 - **Real issue found by the smoke test:** after rollouts, a request to `/` timed out (old pod got SIGTERM before the ingress stopped routing to it). Rollback fired correctly in dev and in prod. Fixes: `preStop: sleep 5` so the ingress drains first (PR #35), and smoke.sh now retries every check until a 120 s deadline so a pod-swap blip is not a false rollback (PR #36). The first rollout to a preStop version still raced because the old pods lacked the hook. Screenshot: p7.3-prod-rollback.png.
 - **P7.4 one deploy at a time:** two quick merges (PRs #34, #35); run #7's deploy-prod showed "waiting for deploy-prod (cd #6) to complete" (`concurrency: deploy-prod`, `cancel-in-progress: false`). Screenshot: p7.4-queued.png.
+
+## Phase 8: Observability, failure drill, security checks
+
+### P8.1 Logs and queries
+- Container Insights sends to Log Analytics (`log-hello-mt-<env>`). Queries are in [`docs/queries.kql`](queries.kql).
+- **Finding:** at first no data arrived at all. With `msi_auth_for_monitoring_enabled = true`, AKS needs a Data Collection Rule plus an association, and Terraform doesn't create them automatically. `az monitor data-collection rule association list` returned `[]`. Fixed in PR #44 (`infra/modules/aks/monitoring.tf`).
+- **Finding:** nginx's access log wasn't on stdout, so it never reached ContainerLogV2. Fixed in PR #45 (`access_log /dev/stdout;`). Q1 then returned 20 rows of `GET /`.
+
+### P8.2 Alert and notification
+- Action group `ag-hello-mt-<env>` with email receiver `owner-email`; scheduled query alert `alert-restarts-hello-mt-<env>` (Sev2, checked every 5 minutes).
+- The email address isn't in the repo: it's a GitHub variable (`ALERT_EMAIL`) passed to a sensitive Terraform variable.
+- Azure requires the address to be verified (one-time code). Verified; a test notification was received.
+
+### P8.3 Failure drill (dev)
+Timeline, 2026-11-13 (UTC):
+
+| Time | Event |
+|---|---|
+| 02:05 | Broke dev: `kubectl set image deployment/hello hello=busybox:1.36`, so the new pod went into CrashLoopBackOff |
+| 02:05 onward | The old pod kept serving traffic (`maxUnavailable: 0`), so the site stayed up |
+| 02:06–02:14 | Q2 and Q3 show the restart count climbing 3 → 6 |
+| ~02:20 | **No alert.** Q4 returned no rows |
+| ~02:35 | Fix merged and applied (PR #46) |
+| 02:43 | Alert fired, Sev2 email received |
+| ~02:55 | Restored with `scripts/deploy.sh dev 2d672a5…`; one pod `1/1 Running` |
+
+- **Finding: the alert could never fire for a crash loop.** Kubernetes waits up to 5 minutes between restarts (CrashLoopBackOff cap), so a 15-minute window holds at most about 3 restarts, and the rule needed more than 3. Q3's timeline proved it (3 → 6 over 8 minutes, then flat). Fixed by widening the window to 30 minutes (PR #46), applied to dev and prod.
+- An earlier drill run found the missing DCR (P8.1) and needed the pod pinned to UID/GID 101 (PR #43) so the busybox test crash-loops instead of being rejected under `runAsNonRoot`.
+- Uptime check during the first drill run: one isolated failed request (`000`) out of about 300, roughly 99.7%. Recorded as observed.
+
+### P8.4 Security checks
+
+| Check | Result |
+|---|---|
+| No subscription-scope role assignments for the pipeline identities | ✅ |
+| gitleaks over full history (89 commits) | ✅ no leaks |
+| No `latest` image tags (images tagged by commit SHA) | ✅ |
+| Every workflow sets top-level `permissions:` | ✅ 4 of 4 (5 with `scan-deployed.yml`) |
+| Re-scan of the deployed image | ✅ after fix, see below |
+
+**Deployed-image scan.** CI scans at build time, but new CVEs are published later. `scan-deployed.yml` (PR #48) re-scans the newest image in ACR weekly and on demand, logging in with OIDC (no secrets).
+- 2026-11-14, run 43609088518, image `2d672a5…`: **3 HIGH, 0 CRITICAL**, all fixable (musl and musl-utils CVE-2026-107891, zlib CVE-2026-85091).
+- Dependabot's PR #47 only updated the **build** stage; the vulnerable packages were in the **runtime** stage (`nginx-unprivileged`), so it wouldn't have fixed them.
+- PR #49: `apk upgrade --no-cache` in the runtime stage (root for that one step, then back to `USER 101`). CI passed, CD deployed to dev.
+- Re-scan, run 43630578641, image `ec36683…`: **0 HIGH, 0 CRITICAL.**
+- Side note: running Trivy locally was blocked by Windows Smart App Control. I didn't weaken the policy; I moved the scan into GitHub Actions instead.
+
+### Lessons learned
+- Test alerts by breaking things on purpose. Both monitoring bugs (no data, alert that couldn't fire) only showed up in the drill.
+- A clean scan at build time isn't permanent. Re-scan what's actually deployed.
+- Read which Dockerfile stage a dependency update touches before assuming it fixes a finding.
