@@ -1,0 +1,33 @@
+// Phase 8 - Log Analytics queries (workspace: log-hello-mt-<env>)
+
+// Q1 - nginx access log from the app pods (ContainerLogV2).
+// Needs the Container Insights DCR (PR #44) and access_log to stdout (PR #45).
+ContainerLogV2
+| where TimeGenerated > ago(30m)
+| where PodNamespace == "hello"
+| where tostring(LogMessage) has "GET /"
+| project TimeGenerated, PodName, LogMessage
+| order by TimeGenerated desc
+
+// Q2 - pods in the hello namespace and their restart counts.
+KubePodInventory
+| where TimeGenerated > ago(30m)
+| where Namespace == "hello"
+| summarize Restarts = max(ContainerRestartCount), LastSeen = max(TimeGenerated) by PodName = Name
+| order by Restarts desc
+
+// Q3 - restart timeline for one pod (used to diagnose the alert window bug).
+KubePodInventory
+| where TimeGenerated > ago(30m)
+| where Name == "<pod-name>"
+| summarize Restarts = max(ContainerRestartCount) by bin(TimeGenerated, 1m)
+| order by TimeGenerated asc
+
+// Q4 - the alert rule's query (alert-restarts-hello-mt-<env>).
+// Window is 30 minutes (PR #46); fires when the result has any rows.
+KubePodInventory
+| where TimeGenerated > ago(30m)
+| where Namespace == "hello"
+| where isnotempty(ContainerName)
+| summarize Restarts = max(ContainerRestartCount) - min(ContainerRestartCount) by PodName = Name, ContainerName
+| where Restarts > 3
