@@ -9,7 +9,7 @@ RUN rm -f nginx.conf \
  && printf '{"version":"%s"}\n' "$APP_VERSION" > version.json
 
 # ---- Runtime stage: non-root nginx on port 8080 ----
-FROM nginxinc/nginx-unprivileged:1.30.7-alpine-slim
+FROM nginxinc/nginx-unprivileged:1.31.7-alpine-slim@sha256:a8cb0f33d51fa107c96fd2bd3a71aaf564ec131e9d2bdf8700944f0ed8b170d7
 ARG APP_VERSION=unknown
 LABEL org.opencontainers.image.source="https://github.com/TheProgrammingPath/hello-mt" \
       org.opencontainers.image.revision="${APP_VERSION}" \
