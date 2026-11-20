@@ -46,7 +46,7 @@ spec:
                 command: ["sleep", "5"]
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /healthz-typo
               port: http
             initialDelaySeconds: 2
             periodSeconds: 5
